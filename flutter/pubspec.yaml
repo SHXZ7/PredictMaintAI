@@ -30,14 +30,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # Notice these are now aligned with "flutter"
   google_fonts: ^6.1.0
-  cupertino_icons: ^1.0.8
+  http: ^1.2.0  # <--- Add this for OpenRouter
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -87,3 +86,8 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon.png" # <--- THIS LINE TELLS IT WHERE TO LOOK
+  min_sdk_android: 21# Make sure you have an icon file here

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'profile_screen.dart'; // Import the Profile Screen
+import 'profile_screen.dart'; // Navigates to Profile
+import 'analytics_screen.dart'; // Navigates to Analytics (NEW)
+import 'chat_screen.dart';
+import 'settings_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  // --- THEME COLORS (Matches Welcome Screen) ---
+  // --- THEME COLORS ---
   final Color _bgDeep = const Color(0xFF0A0B14);
   final Color _cardBg = const Color(0xFF151725);
   final Color _geminiBlue = const Color(0xFF3B82F6);
@@ -57,7 +60,7 @@ class DashboardScreen extends StatelessWidget {
             icon: Icon(Icons.notifications_none, color: _textDim),
             onPressed: () {},
           ),
-          // --- PROFILE ICON WITH NAVIGATION ---
+          // PROFILE ICON
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: GestureDetector(
@@ -83,7 +86,7 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 1. SYSTEM OVERVIEW ROW ---
+            // --- 1. METRICS ROW ---
             Text(
               'SYSTEM METRICS',
               style: GoogleFonts.spaceMono(
@@ -98,7 +101,7 @@ class DashboardScreen extends StatelessWidget {
                 Expanded(
                   child: _buildDarkStatCard(
                     'ACTIVE',
-                    '21',
+                    '24',
                     _geminiBlue,
                     Icons.power,
                   ),
@@ -126,7 +129,7 @@ class DashboardScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // --- 2. MAIN CHART / PERFORMANCE AREA ---
+            // --- 2. GRAPH AREA ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -165,12 +168,6 @@ class DashboardScreen extends StatelessWidget {
                 color: _cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white.withOpacity(0.05)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
-                  ),
-                ],
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -179,9 +176,9 @@ class DashboardScreen extends StatelessWidget {
                   _buildBar(0.4, _geminiBlue),
                   _buildBar(0.6, _geminiBlue),
                   _buildBar(0.5, _geminiBlue),
-                  _buildBar(0.8, _accentCyan), // Peak
+                  _buildBar(0.8, _accentCyan),
                   _buildBar(0.7, _geminiBlue),
-                  _buildBar(0.3, Colors.orange), // Warning Dip
+                  _buildBar(0.3, Colors.orange),
                   _buildBar(0.6, _geminiBlue),
                   _buildBar(0.9, _accentCyan),
                 ],
@@ -190,7 +187,7 @@ class DashboardScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // --- 3. ACTIVE MACHINES LIST ---
+            // --- 3. MACHINES LIST ---
             Text(
               'UNIT STATUS LOG',
               style: GoogleFonts.spaceMono(
@@ -219,15 +216,11 @@ class DashboardScreen extends StatelessWidget {
               'OFFLINE',
               Colors.red,
             ),
-            _buildMachineRow(
-              'Conveyor Belt M1',
-              'Sector 1',
-              'OPERATIONAL',
-              Colors.green,
-            ),
           ],
         ),
       ),
+
+      // --- BOTTOM NAVIGATION BAR ---
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: _bgDeep,
@@ -237,10 +230,56 @@ class DashboardScreen extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(Icons.dashboard_rounded, true),
-            _buildNavItem(Icons.analytics_outlined, false),
-            _buildNavItem(Icons.history, false),
-            _buildNavItem(Icons.settings_outlined, false),
+            // 1. Home (Active)
+            IconButton(
+              icon: const Icon(Icons.dashboard_rounded),
+              color: _geminiBlue,
+              onPressed: () {}, // Already here
+            ),
+
+            // 2. Analytics (Navigates to Analytics Page)
+            IconButton(
+              icon: const Icon(Icons.analytics_outlined),
+              color: Colors.white24,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AnalyticsScreen(),
+                  ),
+                );
+              },
+            ),
+
+            // 3. History (Placeholder)
+            // 3. AI Support / History Tab
+            IconButton(
+              icon: const Icon(
+                Icons.support_agent,
+              ), // Changed icon to represent Help Desk
+              color: Colors.white24,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatScreen()),
+                );
+              },
+            ),
+
+            // 4. Settings (Placeholder)
+            // 4. Settings Tab
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              color: Colors.white24,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -294,13 +333,6 @@ class DashboardScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: color.withOpacity(0.8),
             borderRadius: BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.2),
-                blurRadius: 8,
-                spreadRadius: 1,
-              ),
-            ],
           ),
         );
       },
@@ -365,20 +397,11 @@ class DashboardScreen extends StatelessWidget {
                 color: statusColor,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 1,
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, bool isActive) {
-    return IconButton(
-      icon: Icon(icon),
-      color: isActive ? _geminiBlue : Colors.white24,
-      onPressed: () {},
     );
   }
 }

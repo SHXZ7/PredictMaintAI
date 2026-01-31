@@ -15,5 +15,8 @@ if not MONGO_URL:
 client = MongoClient(MONGO_URL)
 db = client["jain_uni"]
 users_collection = db["users"]
+sensor_collection = db["sensor_data"]
+alerts_collection = db["alerts"]
+predictions_collection = db["predictions"]
 
 print("✅ MongoDB Atlas client initialized")

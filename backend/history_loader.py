@@ -1,15 +1,13 @@
 import pickle
 import os
 import random
+from constants import MACHINES
 
 HISTORY_PATH = os.path.join(os.path.dirname(__file__), "history.pkl")
 
 def load_history():
     with open(HISTORY_PATH, "rb") as f:
         data = pickle.load(f)
-
-    # Machine IDs for assignment
-    machines = ["Machine_A", "Machine_B", "Machine_C", "Machine_D", "Machine_E"]
 
     # Ensure timestamps are strings (JSON safe)
     for row in data:
@@ -27,8 +25,11 @@ def load_history():
         if "anomaly_score" in row:
             row["anomaly_score"] = float(row["anomaly_score"])
         
-        # Assign machine_id if not present (for historical data)
+        # Assign machine_id from MACHINES constant (not Machine_A to Machine_E)
         if "machine_id" not in row:
-            row["machine_id"] = random.choice(machines)
+            row["machine_id"] = random.choice(MACHINES)
+        # Replace old names with new ones
+        elif row["machine_id"].startswith("Machine_"):
+            row["machine_id"] = random.choice(MACHINES)
 
     return data

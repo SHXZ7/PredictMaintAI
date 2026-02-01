@@ -13,11 +13,14 @@ router = APIRouter()
 
 @router.post("/sensor")
 def ingest_sensor(data: dict):
-    machine_id = random.choice(MACHINES)
+    # Use machine_id from request if provided, otherwise random
+    machine_id = data.get("machine_id")
+    if not machine_id:
+        machine_id = random.choice(MACHINES)
     
     sensor_collection.insert_one({
         "machine_id": machine_id,
-        "timestamp": str(datetime.utcnow()),
+        "timestamp": datetime.utcnow(),
         "health": float(data["health"]),
         "anomaly_score": float(data["anomaly"]),
         "status": data["status"]
@@ -73,20 +76,42 @@ def get_status_summary():
 
 @router.get("/trends")
 def get_trends(
-    machine_id: str,
-    hours: int = 24
+    machine_id: str = Query(None),
+    hours: int = Query(24)
 ):
-    since = datetime.utcnow() - timedelta(hours=hours)
-
+    """
+    Get trend data for visualization
+    Supports both fleet-wide and machine-specific queries
+    """
+    query = {}
+    
+    # If machine_id is provided, filter by it
+    if machine_id:
+        # Validate machine exists
+        count = sensor_collection.count_documents({"machine_id": machine_id})
+        if count == 0:
+            # Machine has no data yet, return empty array
+            return []
+        query["machine_id"] = machine_id
+    
+    # Calculate time threshold
+    time_threshold = datetime.utcnow() - timedelta(hours=hours)
+    query["timestamp"] = {"$gte": time_threshold}
+    
+    # Fetch data sorted by timestamp
     cursor = sensor_collection.find(
-        {
-            "machine_id": machine_id,
-            "timestamp": {"$gte": str(since)}
-        },
-        {"_id": 0}
-    ).sort("timestamp", 1)
-
-    return list(cursor)
+        query, 
+        {"_id": 0, "machine_id": 1, "health": 1, "anomaly_score": 1, "status": 1, "timestamp": 1}
+    ).sort("timestamp", 1).limit(hours * 60)  # Limit to reasonable size
+    
+    data = list(cursor)
+    
+    # Convert timestamps to strings for JSON serialization
+    for item in data:
+        if "timestamp" in item:
+            item["timestamp"] = str(item["timestamp"])
+    
+    return data
 
 @router.get("/trends/summary")
 def get_trends_summary(
@@ -160,11 +185,24 @@ def call_llm_api(prompt: str) -> str:
         
         # List of free models to try in order of preference
         free_models = [
-            "upstage/solar-pro-3:free",           # Best free model - 102B params
-            "liquid/lfm-2.5-1.2b-thinking:free",  # Good reasoning capability
-            "meta-llama/llama-3.1-8b-instruct:free",  # Reliable fallback
-            "google/gemini-2.0-flash-exp:free",   # Google's free option
-            "liquid/lfm-2.5-1.2b-instruct:free"   # Compact alternative
+    "mistralai/mistral-7b-instruct",
+    "mistralai/mixtral-8x7b-instruct",
+
+    # LLaMA-based strong general models
+    "meta-llama/llama-3-8b-instruct",
+    "meta-llama/llama-2-13b-chat",
+
+    # Good for longer reasoning / explanations
+    "huggingfaceh4/zephyr-7b-beta",
+    "togethercomputer/redpajama-incite-chat-3b",
+
+    # Code + reasoning friendly
+    "deepseek-ai/deepseek-coder-6.7b-instruct",
+    "codellama/codellama-7b-instruct",
+
+    # Lightweight / fast (lower cost, quick replies)
+    "google/gemma-7b-it",
+    "tiiuae/falcon-7b-instruct",   # Compact alternative
         ]
         
         # Try each model until one succeeds

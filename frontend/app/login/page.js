@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import ProButton from "../components/ProButton"
 
 // ==================== UTILITY COMPONENTS ====================
 
@@ -143,6 +144,7 @@ export default function LoginPage() {
 
   return (
     <div className="login-container">
+      <ProButton />
       <div className="background-grid"></div>
       <div className="background-glow glow-1"></div>
       <div className="background-glow glow-2"></div>

@@ -28,9 +28,24 @@ Active Alerts: {machine_data['unacknowledged_alerts']}
 In 2-3 sentences, explain what's happening with this machine and why. Be concise and actionable."""
 
         free_models = [
-            "meta-llama/llama-3-8b-instruct",
-            "mistralai/mistral-7b-instruct",
-            "google/gemma-7b-it"
+    "mistralai/mistral-7b-instruct",
+    "mistralai/mixtral-8x7b-instruct",
+
+    # LLaMA-based strong general models
+    "meta-llama/llama-3-8b-instruct",
+    "meta-llama/llama-2-13b-chat",
+
+    # Good for longer reasoning / explanations
+    "huggingfaceh4/zephyr-7b-beta",
+    "togethercomputer/redpajama-incite-chat-3b",
+
+    # Code + reasoning friendly
+    "deepseek-ai/deepseek-coder-6.7b-instruct",
+    "codellama/codellama-7b-instruct",
+
+    # Lightweight / fast (lower cost, quick replies)
+    "google/gemma-7b-it",
+    "tiiuae/falcon-7b-instruct",
         ]
         
         for model_name in free_models:
@@ -118,7 +133,7 @@ def compute_machine_health(machine_id: str):
     if len(data) < 5:
         return None  # Not enough data
     
-    # Calculate health metrics
+    # Calculate health metrics with SMOOTHING to avoid extreme values
     health_values = []
     for d in data:
         h = float(d.get("health", 0))
@@ -126,14 +141,21 @@ def compute_machine_health(machine_id: str):
             h = h * 100
         health_values.append(h)
     
+    # Use weighted average - recent readings have more weight but not extreme
     avg_health = sum(health_values) / len(health_values)
     recent_health = sum(health_values[:10]) / min(10, len(health_values))
+    
+    # SMOOTHED health score - 70% recent, 30% historical average
+    smoothed_health = (recent_health * 0.7) + (avg_health * 0.3)
+    
     health_trend = recent_health - avg_health  # Positive = improving, Negative = degrading
     
-    # Calculate anomaly metrics
+    # Calculate anomaly metrics with REALISTIC thresholds
     anomaly_scores = [float(d.get("anomaly_score", 0)) for d in data]
     avg_anomaly = sum(anomaly_scores) / len(anomaly_scores)
-    high_anomalies = sum(1 for a in anomaly_scores if a > 0.5)
+    
+    # Only count SIGNIFICANT anomalies (>0.7 instead of >0.5)
+    high_anomalies = sum(1 for a in anomaly_scores if a > 0.7)
     anomaly_rate = (high_anomalies / len(anomaly_scores)) * 100
     
     # Get most recent status
@@ -157,17 +179,41 @@ def compute_machine_health(machine_id: str):
         {"_id": 0, "failure_probability": 1, "time_to_failure_hours": 1, "timestamp": 1}
     )
     
-    # Determine overall health status
-    if critical_alerts > 0 or recent_health < 30:
+    # INDUSTRY-STANDARD STATUS DETERMINATION
+    # Critical: Only if multiple severe conditions exist
+    # Warning: One or two concerning conditions
+    # Healthy: Normal operating range
+    
+    critical_conditions = 0
+    warning_conditions = 0
+    
+    # Check each condition independently
+    if smoothed_health < 35:
+        critical_conditions += 1
+    elif smoothed_health < 55:
+        warning_conditions += 1
+    
+    if anomaly_rate > 35:  # More than 35% anomalies
+        critical_conditions += 1
+    elif anomaly_rate > 20:  # More than 20% anomalies
+        warning_conditions += 1
+    
+    if critical_alerts > 2:  # Multiple critical alerts
+        critical_conditions += 1
+    elif critical_alerts > 0 or recent_alerts > 3:
+        warning_conditions += 1
+    
+    # Determine status based on conditions
+    if critical_conditions >= 2:  # At least 2 critical conditions
         overall_status = "CRITICAL"
-    elif recent_alerts > 0 or recent_health < 60:
+    elif critical_conditions >= 1 or warning_conditions >= 2:  # 1 critical OR 2 warnings
         overall_status = "WARNING"
     else:
         overall_status = "HEALTHY"
     
     result = {
         "machine_id": machine_id,
-        "health_score": round(recent_health, 1),
+        "health_score": round(smoothed_health, 1),
         "avg_health": round(avg_health, 1),
         "health_trend": round(health_trend, 1),
         "anomaly_rate": round(anomaly_rate, 1),

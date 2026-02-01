@@ -16,6 +16,7 @@ export default function HealthPage() {
   const [chatInput, setChatInput] = useState("")
   const [chatLoading, setChatLoading] = useState(false)
   const [selectedMachineForChat, setSelectedMachineForChat] = useState(null)
+  const [showFormatMenu, setShowFormatMenu] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem("authToken")
@@ -52,28 +53,51 @@ export default function HealthPage() {
     
     for (const machine of machines) {
       try {
+        console.log(`Fetching trends for ${machine.machine_id}...`)
+        
         const res = await fetch(
-          `http://localhost:8000/api/trends?machine_id=${machine.machine_id}&hours=6`
+          `http://localhost:8000/api/trends?machine_id=${machine.machine_id}&hours=6`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
         )
+        
+        if (!res.ok) {
+          console.warn(`Trends API returned ${res.status} for ${machine.machine_id}`)
+          histories[machine.machine_id] = []
+          continue
+        }
+        
         const trendData = await res.json()
         
+        console.log(`Received ${trendData.length} data points for ${machine.machine_id}`)
+        
         // Transform data for chart
-        histories[machine.machine_id] = trendData.slice(-20).map((point, idx) => {
-          let health = parseFloat(point.health) || 0
-          if (health <= 1 && health > 0) {
-            health = health * 100
-          }
-          return {
-            index: idx,
-            health: health
-          }
-        })
+        if (Array.isArray(trendData) && trendData.length > 0) {
+          histories[machine.machine_id] = trendData.slice(-20).map((point, idx) => {
+            let health = parseFloat(point.health) || 0
+            if (health <= 1 && health > 0) {
+              health = health * 100
+            }
+            return {
+              index: idx,
+              health: health
+            }
+          })
+        } else {
+          // No data available yet
+          histories[machine.machine_id] = []
+        }
       } catch (error) {
         console.error(`Error fetching history for ${machine.machine_id}:`, error)
         histories[machine.machine_id] = []
       }
     }
     
+    console.log('Machine histories loaded:', Object.keys(histories).length)
     setMachineHistory(histories)
   }
 
@@ -168,6 +192,52 @@ export default function HealthPage() {
     }
   }
 
+  const downloadReport = async (format = 'txt') => {
+    setShowFormatMenu(false)
+    
+    try {
+      console.log(`Downloading report in ${format} format...`)
+      
+      const response = await fetch(`http://localhost:8000/api/report/download?format=${format}`)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      // Get the blob from response
+      const blob = await response.blob()
+      console.log(`Downloaded blob size: ${blob.size} bytes`)
+      
+      // Create object URL for the blob
+      const url = window.URL.createObjectURL(blob)
+      
+      // Create temporary anchor element
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      
+      // Set filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]
+      a.download = `fleet_health_report_${timestamp}.${format}`
+      
+      // Append to body, click, and remove
+      document.body.appendChild(a)
+      a.click()
+      
+      // Cleanup
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      }, 100)
+      
+      console.log('✅ Download completed successfully')
+      
+    } catch (error) {
+      console.error('❌ Download error:', error)
+      alert(`Failed to download report: ${error.message}`)
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -225,10 +295,122 @@ export default function HealthPage() {
       <Navbar />
       <div style={{ padding: "30px", paddingTop: "80px", color: "#fff", maxWidth: "1400px", margin: "0 auto" }}>
         
-        {/* Header */}
+        {/* Header with Download Button */}
         <div style={{ marginBottom: "30px" }}>
-          <h1 style={{ fontSize: "32px", marginBottom: "10px" }}>Fleet Health Monitor</h1>
-          <p style={{ color: "#aaa" }}>Real-time equipment health scores and metrics</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <h1 style={{ fontSize: "32px", marginBottom: "10px" }}>Fleet Health Monitor</h1>
+              <p style={{ color: "#aaa" }}>Real-time equipment health scores and metrics</p>
+            </div>
+            
+            {/* Unified Download Report Button with Dropdown */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowFormatMenu(!showFormatMenu)}
+                style={{
+                  padding: "12px 24px",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  border: "none",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)"
+                }}
+              >
+                📥 Download Report
+                <span style={{ fontSize: "10px" }}>▼</span>
+              </button>
+              
+              {/* Format Selection Dropdown */}
+              {showFormatMenu && (
+                <div style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  background: "#1e293b",
+                  border: "1px solid #334155",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                  zIndex: 1000,
+                  minWidth: "200px",
+                  overflow: "hidden"
+                }}>
+                  <button
+                    onClick={() => downloadReport('txt')}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: "transparent",
+                      border: "none",
+                      color: "#fff",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = "#334155"}
+                    onMouseLeave={(e) => e.target.style.background = "transparent"}
+                  >
+                    📄 Text Format (.txt)
+                  </button>
+                  
+                  <button
+                    onClick={() => downloadReport('json')}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: "transparent",
+                      border: "none",
+                      borderTop: "1px solid #334155",
+                      color: "#fff",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = "#334155"}
+                    onMouseLeave={(e) => e.target.style.background = "transparent"}
+                  >
+                    📊 JSON Format (.json)
+                  </button>
+                  
+                  <button
+                    onClick={() => downloadReport('pdf')}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: "transparent",
+                      border: "none",
+                      borderTop: "1px solid #334155",
+                      color: "#fff",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = "#334155"}
+                    onMouseLeave={(e) => e.target.style.background = "transparent"}
+                  >
+                    📑 PDF Format (.pdf)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Fleet Summary */}
@@ -736,6 +918,18 @@ export default function HealthPage() {
         </div>
 
       </div>
+      
+      {/* Click outside to close dropdown */}
+      {showFormatMenu && (
+        <div
+          onClick={() => setShowFormatMenu(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999
+          }}
+        />
+      )}
     </>
   )
 }

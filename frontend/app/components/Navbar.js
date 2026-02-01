@@ -8,6 +8,7 @@ export default function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const circleRefs = useRef([])
   const tlRefs = useRef([])
   const activeTweenRefs = useRef([])
@@ -16,6 +17,7 @@ export default function Navbar() {
   const mobileMenuRef = useRef(null)
   const navItemsRef = useRef(null)
   const logoRef = useRef(null)
+  const profileMenuRef = useRef(null)
 
   const navItems = [
     { label: 'Overview', href: '/dashboard' },
@@ -170,6 +172,42 @@ export default function Navbar() {
     }
   }
 
+  const toggleProfileMenu = () => {
+    const newState = !isProfileOpen
+    setIsProfileOpen(newState)
+
+    const menu = profileMenuRef.current
+
+    if (menu) {
+      if (newState) {
+        gsap.set(menu, { visibility: 'visible' })
+        gsap.fromTo(
+          menu,
+          { opacity: 0, y: 10, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: 'power3.easeOut' }
+        )
+      } else {
+        gsap.to(menu, {
+          opacity: 0,
+          y: 10,
+          scale: 0.95,
+          duration: 0.2,
+          onComplete: () => gsap.set(menu, { visibility: 'hidden' })
+        })
+      }
+    }
+  }
+
+  const handleProfileAction = (action) => {
+    setIsProfileOpen(false)
+    if (action === 'logout') {
+      localStorage.removeItem('authToken')
+      router.push('/login')
+    } else {
+      router.push(action)
+    }
+  }
+
   const handleNavigation = (href) => {
     router.push(href)
     setIsMobileMenuOpen(false)
@@ -219,6 +257,7 @@ export default function Navbar() {
           justify-content: center;
           cursor: pointer;
           transition: transform 0.3s;
+          position: relative;
         }
 
         .dashboard-pill-logo:hover {
@@ -415,6 +454,76 @@ export default function Navbar() {
           background: #1e293b;
           color: #3b82f6;
         }
+
+        .profile-button {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+          border: 2px solid rgba(59, 130, 246, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+          font-size: 1.2rem;
+          transition: all 0.3s;
+        }
+
+        .profile-button:hover {
+          transform: scale(1.05);
+          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        .profile-menu {
+          position: absolute;
+          top: 3.5rem;
+          right: 0;
+          background: #0a0e17;
+          border-radius: 16px;
+          padding: 0.5rem;
+          min-width: 200px;
+          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+          border: 1px solid #1e293b;
+          z-index: 1000;
+          opacity: 0;
+          visibility: hidden;
+        }
+
+        .profile-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.875rem 1rem;
+          color: #e2e8f0;
+          background: transparent;
+          border: none;
+          width: 100%;
+          text-align: left;
+          font-size: 14px;
+          font-weight: 600;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .profile-menu-item:hover {
+          background: #1e293b;
+        }
+
+        .profile-menu-item.logout {
+          color: #ef4444;
+        }
+
+        .profile-menu-item.logout:hover {
+          background: rgba(239, 68, 68, 0.1);
+        }
+
+        .profile-menu-divider {
+          height: 1px;
+          background: #1e293b;
+          margin: 0.25rem 0;
+        }
       `}</style>
 
       <div className="dashboard-nav-container">
@@ -456,6 +565,7 @@ export default function Navbar() {
             </ul>
           </div>
 
+          {/* Mobile Hamburger Menu */}
           <button
             className="mobile-menu-button mobile-only"
             onClick={toggleMobileMenu}
@@ -464,8 +574,18 @@ export default function Navbar() {
             <span className="hamburger-line" />
             <span className="hamburger-line" />
           </button>
+
+          {/* Profile Button (Desktop) */}
+          <button
+            className="profile-button desktop-only"
+            onClick={toggleProfileMenu}
+            title="Profile Menu"
+          >
+            👤
+          </button>
         </nav>
 
+        {/* Mobile Navigation Menu */}
         <div className="mobile-menu-popover mobile-only" ref={mobileMenuRef}>
           <ul className="mobile-menu-list">
             {navItems.map((item) => (
@@ -478,9 +598,114 @@ export default function Navbar() {
                 </button>
               </li>
             ))}
+            
+            <div className="profile-menu-divider"></div>
+            
+            {/* Profile options in mobile menu */}
+            <li>
+              <button
+                onClick={() => handleProfileAction('/profile')}
+                className="mobile-menu-link"
+              >
+                👤 Profile
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => handleProfileAction('/settings')}
+                className="mobile-menu-link"
+              >
+                ⚙️ Settings
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => handleProfileAction('/manage-workers-access')}
+                className="mobile-menu-link"
+              >
+                🔐 Manage Workers Access
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => handleProfileAction('/machines')}
+                className="mobile-menu-link"
+              >
+                🏭 Machines
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => handleProfileAction('logout')}
+                className="mobile-menu-link logout"
+                style={{ color: '#ef4444' }}
+              >
+                🚪 Logout
+              </button>
+            </li>
           </ul>
         </div>
+
+        {/* Profile Menu (Desktop) */}
+        <div className="profile-menu desktop-only" ref={profileMenuRef}>
+          <button
+            className="profile-menu-item"
+            onClick={() => handleProfileAction('/profile')}
+          >
+            <span>👤</span>
+            <span>Profile</span>
+          </button>
+          
+          <button
+            className="profile-menu-item"
+            onClick={() => handleProfileAction('/settings')}
+          >
+            <span>⚙️</span>
+            <span>Settings</span>
+          </button>
+          
+          <button
+            className="profile-menu-item"
+            onClick={() => handleProfileAction('/manage-workers-access')}
+          >
+            <span>🔐</span>
+            <span>Manage Workers Access</span>
+          </button>
+          
+          <button
+            className="profile-menu-item"
+            onClick={() => handleProfileAction('/machines')}
+          >
+            <span>🏭</span>
+            <span>Machines</span>
+          </button>
+          
+          <div className="profile-menu-divider"></div>
+          
+          <button
+            className="profile-menu-item logout"
+            onClick={() => handleProfileAction('logout')}
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
+        </div>
       </div>
+
+      {/* Click outside to close menus */}
+      {(isMobileMenuOpen || isProfileOpen) && (
+        <div
+          onClick={() => {
+            setIsMobileMenuOpen(false)
+            setIsProfileOpen(false)
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 998
+          }}
+        />
+      )}
     </>
   )
 }

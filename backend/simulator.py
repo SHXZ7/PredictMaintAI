@@ -2,42 +2,59 @@ import requests
 import time
 import random
 from datetime import datetime
+from constants import MACHINES
 
 def simulate_sensor_data():
-    """Generate and send simulated sensor data every 2 seconds"""
-    print("🔄 Starting sensor data simulator...")
+    """Generate and send simulated REALISTIC sensor data - EVEN DISTRIBUTION"""
+    print("🔄 Starting INDUSTRY-GRADE sensor data simulator...")
+    print(f"📊 Distributing data across {len(MACHINES)} machines")
+    
+    machine_index = 0  # Track which machine to send to
     
     while True:
-        # Generate realistic sensor values
-        health = random.uniform(20, 95)  # 20-95%
-        anomaly = random.uniform(0.1, 0.9)  # 0.1-0.9
+        # **EVEN DISTRIBUTION**: Cycle through machines instead of random
+        machine_id = MACHINES[machine_index]
+        machine_index = (machine_index + 1) % len(MACHINES)
         
-        # Determine status based on health and anomaly
-        if health < 40 or anomaly > 0.7:
+        # REALISTIC health distribution
+        rand = random.random()
+        if rand < 0.60:
+            health = random.uniform(70, 95)
+            anomaly = random.uniform(0.05, 0.25)
+        elif rand < 0.90:
+            health = random.uniform(55, 70)
+            anomaly = random.uniform(0.20, 0.45)
+        else:
+            health = random.uniform(30, 55)
+            anomaly = random.uniform(0.40, 0.75)
+        
+        # Determine status
+        if health < 35 or anomaly > 0.65:
             status = "CRITICAL"
-        elif health < 60 or anomaly > 0.5:
+        elif health < 55 or anomaly > 0.40:
             status = "WARNING"
         else:
             status = "NORMAL"
         
-        # Send to backend
+        # Send to backend with specific machine_id
         try:
             response = requests.post(
                 "http://localhost:8000/api/sensor",
                 json={
                     "health": health,
                     "anomaly": anomaly,
-                    "status": status
+                    "status": status,
+                    "machine_id": machine_id  # Send specific machine
                 }
             )
             
             timestamp = datetime.now().strftime("%H:%M:%S")
-            print(f"[{timestamp}] ✅ Sent: Health={health:.1f}%, Anomaly={anomaly:.3f}, Status={status}")
+            print(f"[{timestamp}] ✅ {machine_id:15s} Health={health:.1f}%, Anomaly={anomaly:.3f}, Status={status}")
             
         except Exception as e:
             print(f"❌ Error sending data: {e}")
         
-        time.sleep(2)  # Send every 2 seconds
+        time.sleep(2)  # Send every 2 seconds (faster distribution)
 
 if __name__ == "__main__":
     simulate_sensor_data()

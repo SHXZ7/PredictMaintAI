@@ -9,30 +9,39 @@ router = APIRouter()
 def generate_alert(machine_id: str, prediction: dict):
     """
     Generate alert based on prediction
-    Satisfies: Lead time, Predictive alerting, Precision control
+    INDUSTRY-GRADE: More conservative thresholds
     """
     hours_to_failure = prediction.get("hours_to_failure", 100)
     confidence = prediction.get("confidence", 0.5)
     
-    # Determine base severity based on lead time
-    if hours_to_failure <= 24:
+    # STRICTER CONDITIONS for alert generation
+    # Only generate if confidence is high enough
+    if confidence < 0.65:
+        return None  # Don't alert on low-confidence predictions
+    
+    # Determine severity based on lead time AND confidence
+    if hours_to_failure <= 12 and confidence > 0.80:  # Imminent failure with high confidence
         severity = "CRITICAL"
-    elif hours_to_failure <= 48:
+    elif hours_to_failure <= 24 and confidence > 0.75:  # Within 24 hours with good confidence
+        severity = "CRITICAL"
+    elif hours_to_failure <= 48 and confidence > 0.70:  # Within 48 hours
+        severity = "WARNING"
+    elif hours_to_failure <= 72:  # Within 72 hours
         severity = "WARNING"
     else:
-        return None  # No alert needed for >48 hours
+        return None  # No alert needed for >72 hours
     
-    # SEVERITY ESCALATION: Check for repeated warnings
-    # If machine has 3+ WARNING alerts in last 2 hours, escalate to CRITICAL
+    # SEVERITY ESCALATION: Check for repeated warnings (more conservative)
     if severity == "WARNING":
         now = datetime.utcnow()
         recent_warnings = alerts_collection.count_documents({
             "machine_id": machine_id,
             "severity": "WARNING",
-            "created_at": {"$gte": now - timedelta(hours=2)}
+            "created_at": {"$gte": now - timedelta(hours=6)}  # Changed from 2 to 6 hours
         })
         
-        if recent_warnings >= 3:
+        # Only escalate if 5+ warnings (not 3+)
+        if recent_warnings >= 5:
             severity = "CRITICAL"
             print(f"⚠️➡️🔴 Escalating {machine_id} to CRITICAL due to {recent_warnings} recent warnings")
     
@@ -47,9 +56,8 @@ def generate_alert(machine_id: str, prediction: dict):
         "acknowledged": False
     }
     
-    # Check for duplicate alerts WITHIN LAST 30 MINUTES (time-based re-alerting)
-    # This allows the same alert to reappear if condition persists
-    time_threshold = datetime.utcnow() - timedelta(minutes=30)
+    # Check for duplicate alerts WITHIN LAST 60 MINUTES (increased from 30)
+    time_threshold = datetime.utcnow() - timedelta(minutes=60)
     
     existing = alerts_collection.find_one({
         "machine_id": machine_id,
@@ -61,17 +69,17 @@ def generate_alert(machine_id: str, prediction: dict):
     if not existing:
         result = alerts_collection.insert_one(alert)
         alert["_id"] = str(result.inserted_id)
-        print(f"🚨 Alert generated: {severity} for {machine_id} (hours_to_failure: {hours_to_failure})")
+        print(f"🚨 Alert generated: {severity} for {machine_id} (hours_to_failure: {hours_to_failure}, confidence: {confidence:.0%})")
         return alert
     else:
-        print(f"⏭️ Skipping duplicate alert for {machine_id} (recent alert exists within 30min)")
+        print(f"⏭️ Skipping duplicate alert for {machine_id} (recent alert exists within 60min)")
     
     return None
 
 def analyze_machine_health(machine_id: str):
     """
     Analyze recent sensor data and generate predictions
-    This is a simplified predictive model
+    MORE REALISTIC model for industry
     """
     # Get last 50 readings for the machine
     cursor = sensor_collection.find(
@@ -84,7 +92,7 @@ def analyze_machine_health(machine_id: str):
     if len(data) < 10:
         return None  # Not enough data
     
-    # Calculate health trend
+    # Calculate health trend with SMOOTHING
     health_values = []
     for d in data:
         h = float(d.get("health", 0))
@@ -96,36 +104,36 @@ def analyze_machine_health(machine_id: str):
     recent_health = sum(health_values[:10]) / 10  # Last 10 readings
     health_decline = avg_health - recent_health
     
-    # Calculate anomaly rate
+    # Calculate anomaly rate with HIGHER threshold
     anomaly_scores = [float(d.get("anomaly_score", 0)) for d in data]
-    high_anomalies = sum(1 for a in anomaly_scores if a > 0.5)
+    high_anomalies = sum(1 for a in anomaly_scores if a > 0.7)  # Changed from 0.5 to 0.7
     anomaly_rate = high_anomalies / len(anomaly_scores)
     max_anomaly = max(anomaly_scores) if anomaly_scores else 0
     
-    # DYNAMIC CONFIDENCE CALCULATION
-    # Base confidence on multiple factors
-    anomaly_confidence = min(95, int(max_anomaly * 100))  # Higher anomaly = higher confidence
-    health_confidence = min(95, int((100 - recent_health) * 0.9))  # Lower health = higher confidence
-    trend_confidence = min(95, int(abs(health_decline) * 3))  # Bigger decline = higher confidence
+    # REALISTIC CONFIDENCE CALCULATION
+    # Start with lower base confidence
+    anomaly_confidence = min(85, int(max_anomaly * 90))  # Reduced from 95 to 85
+    health_confidence = min(85, int((100 - recent_health) * 0.8))  # Reduced multiplier
+    trend_confidence = min(75, int(abs(health_decline) * 2.5))  # Reduced from 3
     
-    # Weighted average of confidence factors
-    confidence = (anomaly_confidence * 0.5 + health_confidence * 0.3 + trend_confidence * 0.2) / 100
-    confidence = max(0.5, min(0.95, confidence))  # Clamp between 50% and 95%
+    # Weighted average with LOWER overall confidence
+    confidence = (anomaly_confidence * 0.4 + health_confidence * 0.35 + trend_confidence * 0.25) / 100
+    confidence = max(0.45, min(0.88, confidence))  # Clamp between 45% and 88% (not 95%)
     
-    # Predictive logic
-    if recent_health < 30 or anomaly_rate > 0.6:
-        hours_to_failure = random.randint(6, 24)
-        # Boost confidence for critical conditions
+    # INDUSTRY-STANDARD Predictive logic
+    if recent_health < 30 and anomaly_rate > 0.4:  # Both conditions must be true
+        hours_to_failure = random.randint(8, 18)
         confidence = max(confidence, 0.80)
-    elif recent_health < 50 or anomaly_rate > 0.4:
-        hours_to_failure = random.randint(24, 48)
-        confidence = max(confidence, 0.65)
-    elif health_decline > 20:
-        hours_to_failure = random.randint(36, 72)
+    elif recent_health < 45 and anomaly_rate > 0.3:
+        hours_to_failure = random.randint(18, 36)
+        confidence = max(confidence, 0.70)
+    elif recent_health < 55 or anomaly_rate > 0.25:
+        hours_to_failure = random.randint(36, 60)
+    elif health_decline > 15:
+        hours_to_failure = random.randint(48, 96)
     else:
-        hours_to_failure = random.randint(72, 120)
-        # Lower confidence for stable conditions
-        confidence = min(confidence, 0.70)
+        hours_to_failure = random.randint(96, 168)  # 4-7 days
+        confidence = min(confidence, 0.65)  # Lower confidence for stable
     
     return {
         "machine_id": machine_id,

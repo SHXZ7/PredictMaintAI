@@ -5,6 +5,7 @@ from history import router as history_router
 from alerts import router as alerts_router
 from predict import router as predict_router
 from ai_chat import router as chat_router
+from report_generator import router as report_router
 from health import compute_machine_health, compute_fleet_health
 from history_loader import load_history
 from database import sensor_collection
@@ -30,6 +31,7 @@ app.include_router(history_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(predict_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(report_router, prefix="/api")
 
 @app.get("/")
 def root():

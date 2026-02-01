@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Navbar from "../components/Navbar"
+import ProButton from "../components/ProButton"
 
 export default function DashboardPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
+  const [fleetData, setFleetData] = useState(null)
+  const [alertsData, setAlertsData] = useState(null)
 
   // 🔐 Auth protection
   useEffect(() => {
@@ -14,49 +17,30 @@ export default function DashboardPage() {
     if (!token) {
       router.push("/login")
     } else {
-      // Simulate loading data
-      setTimeout(() => setIsLoading(false), 800)
+      fetchDashboardData()
     }
   }, [router])
 
-  // 🔹 Mock Overview Data
-  const overviewData = {
-    totalMachines: 12,
-    activeAlerts: 3,
-    criticalMachines: 2,
-    fleetHealth: 82,
-    fleetDistribution: {
-      healthy: 8,
-      warning: 2,
-      critical: 2,
-    },
-    topRiskMachines: [
-      {
-        id: "MOTOR_01",
-        status: "CRITICAL",
-        health: 42,
-        predictedFailure: "18 hrs",
-        icon: "⚙️"
-      },
-      {
-        id: "PUMP_03",
-        status: "WARNING",
-        health: 61,
-        predictedFailure: "36 hrs",
-        icon: "💧"
-      },
-      {
-        id: "HVAC_02",
-        status: "WARNING",
-        health: 68,
-        predictedFailure: "44 hrs",
-        icon: "🌡️"
-      },
-    ],
-    lastUpdated: "6 seconds ago",
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch fleet health data
+      const fleetRes = await fetch("http://localhost:8000/api/health")
+      const fleetResult = await fleetRes.json()
+      setFleetData(fleetResult)
+
+      // Fetch alerts summary
+      const alertsRes = await fetch("http://localhost:8000/api/alerts/summary")
+      const alertsResult = await alertsRes.json()
+      setAlertsData(alertsResult)
+
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  if (isLoading) {
+  if (isLoading || !fleetData) {
     return (
       <>
         <Navbar />
@@ -87,6 +71,29 @@ export default function DashboardPage() {
         `}</style>
       </>
     )
+  }
+
+  // Get top 3 critical/warning machines
+  const topRiskMachines = fleetData.machines
+    .filter(m => m.status === "CRITICAL" || m.status === "WARNING")
+    .sort((a, b) => a.health_score - b.health_score)
+    .slice(0, 3)
+    .map(m => ({
+      id: m.machine_id,
+      status: m.status,
+      health: m.health_score,
+      predictedFailure: m.latest_prediction 
+        ? `${m.latest_prediction.time_to_failure_hours}h` 
+        : "N/A",
+      alerts: m.unacknowledged_alerts,
+      icon: getMachineIcon(m.machine_id)
+    }))
+
+  function getMachineIcon(machineId) {
+    if (machineId.includes("MOTOR")) return "⚙️"
+    if (machineId.includes("PUMP")) return "💧"
+    if (machineId.includes("HVAC")) return "🌡️"
+    return "🏭"
   }
 
   return (
@@ -498,6 +505,7 @@ export default function DashboardPage() {
 
       <div className="dashboard-container">
         <Navbar />
+        <ProButton />
         
         <div className="dashboard-content">
           {/* Header */}
@@ -508,42 +516,54 @@ export default function DashboardPage() {
             </p>
             <div className="live-indicator">
               <span className="live-dot"></span>
-              <span>Live • Updated {overviewData.lastUpdated}</span>
+              <span>Live • Updated just now</span>
             </div>
           </div>
 
-          {/* Stats Grid */}
+          {/* Stats Grid - REAL DATA */}
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon">🏭</div>
               <div className="stat-label">Total Machines</div>
-              <div className="stat-value">{overviewData.totalMachines}</div>
+              <div className="stat-value">{fleetData.total_machines}</div>
               <div className="stat-trend">↑ All systems monitored</div>
             </div>
 
             <div className="stat-card">
               <div className="stat-icon">🔔</div>
               <div className="stat-label">Active Alerts</div>
-              <div className="stat-value">{overviewData.activeAlerts}</div>
-              <div className="stat-trend">⚠️ Requires attention</div>
+              <div className="stat-value">
+                {fleetData.total_unacknowledged_alerts}
+              </div>
+              <div className="stat-trend">
+                {fleetData.total_critical_alerts > 0 ? "⚠️ Requires attention" : "✅ All clear"}
+              </div>
             </div>
 
             <div className="stat-card critical">
               <div className="stat-icon">⚠️</div>
               <div className="stat-label">Critical Machines</div>
-              <div className="stat-value critical">{overviewData.criticalMachines}</div>
-              <div className="stat-trend">🔴 Immediate action needed</div>
+              <div className="stat-value critical">
+                {fleetData.critical_machines}
+              </div>
+              <div className="stat-trend">
+                {fleetData.critical_machines > 0 ? "🔴 Immediate action needed" : "✅ None"}
+              </div>
             </div>
 
             <div className="stat-card">
               <div className="stat-icon">❤️</div>
               <div className="stat-label">Fleet Health</div>
-              <div className="stat-value">{overviewData.fleetHealth}%</div>
-              <div className="stat-trend">↑ +3% from last week</div>
+              <div className="stat-value">{fleetData.fleet_health}%</div>
+              <div className="stat-trend">
+                {fleetData.fleet_health > 70 ? "↑ Good condition" : 
+                 fleetData.fleet_health > 50 ? "➡️ Monitor closely" : 
+                 "↓ Requires attention"}
+              </div>
             </div>
           </div>
 
-          {/* Fleet Health Distribution */}
+          {/* Fleet Health Distribution - REAL DATA */}
           <div className="section">
             <h2 className="section-title">Fleet Health Distribution</h2>
             <div className="health-distribution">
@@ -552,7 +572,7 @@ export default function DashboardPage() {
                   <span className="health-badge healthy"></span>
                   <span>Healthy</span>
                 </div>
-                <span className="health-count">{overviewData.fleetDistribution.healthy}</span>
+                <span className="health-count">{fleetData.healthy_machines}</span>
               </div>
 
               <div className="health-row">
@@ -560,7 +580,7 @@ export default function DashboardPage() {
                   <span className="health-badge warning"></span>
                   <span>Warning</span>
                 </div>
-                <span className="health-count">{overviewData.fleetDistribution.warning}</span>
+                <span className="health-count">{fleetData.warning_machines}</span>
               </div>
 
               <div className="health-row">
@@ -568,63 +588,157 @@ export default function DashboardPage() {
                   <span className="health-badge critical"></span>
                   <span>Critical</span>
                 </div>
-                <span className="health-count">{overviewData.fleetDistribution.critical}</span>
+                <span className="health-count">{fleetData.critical_machines}</span>
               </div>
             </div>
           </div>
 
-          {/* Top At-Risk Machines */}
+          {/* Top At-Risk Machines - REAL DATA */}
           <div className="section">
-            <h2 className="section-title">Top At-Risk Machines</h2>
-            <div className="machines-grid">
-              {overviewData.topRiskMachines.map((machine) => (
-                <div 
-                  key={machine.id} 
-                  className={`machine-card ${machine.status.toLowerCase()}`}
-                  onClick={() => router.push(`/dashboard/live?machine=${machine.id}`)}
-                >
-                  <div className="machine-header">
-                    <div className="machine-id">
-                      <span>{machine.icon}</span>
-                      <span>{machine.id}</span>
+            <h2 className="section-title">
+              {topRiskMachines.length > 0 ? "Top At-Risk Machines" : "All Machines Healthy"}
+            </h2>
+            {topRiskMachines.length > 0 ? (
+              <div className="machines-grid">
+                {topRiskMachines.map((machine) => (
+                  <div 
+                    key={machine.id} 
+                    className={`machine-card ${machine.status.toLowerCase()}`}
+                    onClick={() => router.push("/dashboard/health")}
+                  >
+                    <div className="machine-header">
+                      <div className="machine-id">
+                        <span>{machine.icon}</span>
+                        <span>{machine.id}</span>
+                      </div>
+                      <span className={`machine-status ${machine.status.toLowerCase()}`}>
+                        {machine.status}
+                      </span>
                     </div>
-                    <span className={`machine-status ${machine.status.toLowerCase()}`}>
-                      {machine.status}
-                    </span>
-                  </div>
 
-                  <div className="health-bar-wrapper">
-                    <div className="health-bar-label">
-                      <span>Health Score</span>
-                      <span>{machine.health}%</span>
+                    <div className="health-bar-wrapper">
+                      <div className="health-bar-label">
+                        <span>Health Score</span>
+                        <span>{machine.health}%</span>
+                      </div>
+                      <div className="health-bar-bg">
+                        <div 
+                          className={`health-bar-fill ${
+                            machine.health < 50 ? 'critical' : 
+                            machine.health < 70 ? 'warning' : 'healthy'
+                          }`}
+                          style={{ width: `${machine.health}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="health-bar-bg">
-                      <div 
-                        className={`health-bar-fill ${
-                          machine.health < 50 ? 'critical' : 
-                          machine.health < 70 ? 'warning' : 'healthy'
-                        }`}
-                        style={{ width: `${machine.health}%` }}
-                      ></div>
-                    </div>
-                  </div>
 
-                  <div className="machine-metrics">
-                    <div className="metric">
-                      <span className="metric-label">Predicted Failure</span>
-                      <span className="metric-value">{machine.predictedFailure}</span>
+                    <div className="machine-metrics">
+                      <div className="metric">
+                        <span className="metric-label">Time to Failure</span>
+                        <span className="metric-value">{machine.predictedFailure}</span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">Active Alerts</span>
+                        <span className="metric-value">{machine.alerts}</span>
+                      </div>
                     </div>
-                    <div className="metric">
-                      <span className="metric-label">Risk Level</span>
-                      <span className="metric-value">{machine.status === 'CRITICAL' ? 'High' : 'Medium'}</span>
-                    </div>
-                  </div>
 
-                  <button className="action-button">
-                    View Details →
-                  </button>
-                </div>
-              ))}
+                    <button className="action-button">
+                      View Details →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                background: "rgba(21, 27, 43, 0.6)",
+                padding: "40px",
+                borderRadius: "16px",
+                textAlign: "center",
+                color: "#10b981"
+              }}>
+                <p style={{ fontSize: "48px", marginBottom: "10px" }}>✅</p>
+                <p style={{ fontSize: "18px", fontWeight: "600" }}>
+                  All machines are operating normally
+                </p>
+                <p style={{ color: "#94a3b8", marginTop: "10px" }}>
+                  No critical or warning conditions detected
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="section">
+            <h2 className="section-title">Quick Actions</h2>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "1rem"
+            }}>
+              <button
+                onClick={() => router.push("/dashboard/health")}
+                style={{
+                  padding: "1.5rem",
+                  background: "rgba(59, 130, 246, 0.1)",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                  borderRadius: "12px",
+                  color: "#3b82f6",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.3s"
+                }}
+              >
+                🏥 View Fleet Health
+              </button>
+
+              <button
+                onClick={() => router.push("/dashboard/alerts")}
+                style={{
+                  padding: "1.5rem",
+                  background: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "12px",
+                  color: "#ef4444",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.3s"
+                }}
+              >
+                🚨 Manage Alerts ({fleetData.total_unacknowledged_alerts})
+              </button>
+
+              <button
+                onClick={() => router.push("/dashboard/predictions")}
+                style={{
+                  padding: "1.5rem",
+                  background: "rgba(139, 92, 246, 0.1)",
+                  border: "1px solid rgba(139, 92, 246, 0.3)",
+                  borderRadius: "12px",
+                  color: "#8b5cf6",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.3s"
+                }}
+              >
+                🔮 Make Predictions
+              </button>
+
+              <button
+                onClick={() => router.push("/dashboard/trends")}
+                style={{
+                  padding: "1.5rem",
+                  background: "rgba(16, 185, 129, 0.1)",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  borderRadius: "12px",
+                  color: "#10b981",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.3s"
+                }}
+              >
+                📈 View Trends
+              </button>
             </div>
           </div>
         </div>

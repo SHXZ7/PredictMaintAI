@@ -28,12 +28,17 @@ Active Alerts: {machine_data['unacknowledged_alerts']}
 In 2-3 sentences, explain what's happening with this machine and why. Be concise and actionable."""
 
         free_models = [
+              "tngtech/tng-r1t-chimera:free",
+    "z-ai/glm-4.5-air:free",
+    "arcee-ai/trinity-large-preview:free",
+    "deepseek/deepseek-r1t-chimera:free"
+    "arcee-ai/trinity-large-preview:free",
     "mistralai/mistral-7b-instruct",
     "mistralai/mixtral-8x7b-instruct",
 
     # LLaMA-based strong general models
-    "meta-llama/llama-3-8b-instruct",
-    "meta-llama/llama-2-13b-chat",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "allenai/molmo-2-8b:free",
 
     # Good for longer reasoning / explanations
     "huggingfaceh4/zephyr-7b-beta",

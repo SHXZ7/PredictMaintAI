@@ -59,10 +59,15 @@ Provide a clear, expert response based only on the current system state. Be conc
 
         # Try multiple free models with fallback
         free_models = [
+            "arcee-ai/trinity-large-preview:free",
             "meta-llama/llama-3-8b-instruct",
             "mistralai/mistral-7b-instruct",
             "google/gemma-7b-it",
-            "mistralai/mixtral-8x7b-instruct"
+            "mistralai/mixtral-8x7b-instruct",
+                "deepseek/deepseek-r1t2-chimera:free",
+    "z-ai/glm-4.5-air:free",
+    "arcee-ai/trinity-large-preview:free",
+    "deepseek/deepseek-r1t-chimera:free"
         ]
         
         for model_name in free_models:

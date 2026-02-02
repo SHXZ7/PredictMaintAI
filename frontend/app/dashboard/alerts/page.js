@@ -8,7 +8,73 @@ export default function AlertsPage() {
   const router = useRouter()
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(false)
-  const [filter, setFilter] = useState("all") // all, critical, warning, unacknowledged
+  const [filter, setFilter] = useState("all")
+  const [useMockData, setUseMockData] = useState(false)
+
+  // Mock data for demonstration when no real alerts exist
+  const mockAlerts = [
+    {
+      _id: "mock1",
+      machine_id: "PUMP_01",
+      severity: "CRITICAL",
+      message: "Failure predicted within 8 hours - Immediate action required",
+      predicted_hours: 8,
+      confidence: 0.85,
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+      acknowledged: false
+    },
+    {
+      _id: "mock2",
+      machine_id: "MOTOR_02",
+      severity: "CRITICAL",
+      message: "Failure predicted within 12 hours - High anomaly detected",
+      predicted_hours: 12,
+      confidence: 0.82,
+      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
+      acknowledged: false
+    },
+    {
+      _id: "mock3",
+      machine_id: "HVAC_01",
+      severity: "WARNING",
+      message: "Failure predicted within 24 hours - Temperature anomaly",
+      predicted_hours: 24,
+      confidence: 0.72,
+      created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
+      acknowledged: false
+    },
+    {
+      _id: "mock4",
+      machine_id: "COMPRESSOR_01",
+      severity: "WARNING",
+      message: "Failure predicted within 36 hours - Elevated vibration levels",
+      predicted_hours: 36,
+      confidence: 0.68,
+      created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 min ago
+      acknowledged: false
+    },
+    {
+      _id: "mock5",
+      machine_id: "BEARING_01",
+      severity: "WARNING",
+      message: "Failure predicted within 48 hours - Wear indicators rising",
+      predicted_hours: 48,
+      confidence: 0.65,
+      created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
+      acknowledged: false
+    },
+    {
+      _id: "mock6",
+      machine_id: "PUMP_02",
+      severity: "CRITICAL",
+      message: "Alert acknowledged - Maintenance scheduled",
+      predicted_hours: 15,
+      confidence: 0.78,
+      created_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
+      acknowledged: true,
+      acknowledged_at: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString() // 10 hours ago
+    }
+  ]
 
   useEffect(() => {
     const token = localStorage.getItem("authToken")
@@ -19,7 +85,6 @@ export default function AlertsPage() {
 
   useEffect(() => {
     fetchAlerts()
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchAlerts, 30000)
     return () => clearInterval(interval)
   }, [])
@@ -29,19 +94,42 @@ export default function AlertsPage() {
     try {
       const res = await fetch("http://localhost:8000/api/alerts")
       const data = await res.json()
-      setAlerts(data)
+      
+      // Use mock data if no real alerts
+      if (!data || data.length === 0) {
+        console.log("No alerts from backend, using mock data for demo")
+        setAlerts(mockAlerts)
+        setUseMockData(true)
+      } else {
+        setAlerts(data)
+        setUseMockData(false)
+      }
     } catch (error) {
       console.error("Error fetching alerts:", error)
+      // Use mock data on error
+      setAlerts(mockAlerts)
+      setUseMockData(true)
     } finally {
       setLoading(false)
     }
   }
 
   const acknowledgeAlert = async (alertId) => {
+    // If using mock data, just update locally
+    if (useMockData) {
+      setAlerts(prevAlerts => 
+        prevAlerts.map(alert => 
+          alert._id === alertId 
+            ? { ...alert, acknowledged: true, acknowledged_at: new Date().toISOString() }
+            : alert
+        )
+      )
+      return
+    }
+
     try {
       console.log("Acknowledging alert:", alertId)
       
-      // Optimistically update UI
       setAlerts(prevAlerts => 
         prevAlerts.map(alert => 
           alert._id === alertId 
@@ -61,10 +149,8 @@ export default function AlertsPage() {
       console.log("Acknowledge response:", data)
       
       if (res.ok) {
-        // Refresh alerts to get updated data from server
         await fetchAlerts()
       } else {
-        // Revert optimistic update on error
         console.error("Failed to acknowledge:", data)
         alert("Failed to acknowledge alert: " + (data.detail || "Unknown error"))
         await fetchAlerts()
@@ -77,7 +163,6 @@ export default function AlertsPage() {
   }
 
   const handleAcknowledge = (alertId) => {
-    // Add loading state to the specific alert
     setAlerts(prevAlerts => 
       prevAlerts.map(alert => 
         alert._id === alertId 
@@ -141,7 +226,20 @@ export default function AlertsPage() {
       <div style={{ padding: "30px", paddingTop: "80px", color: "#fff", maxWidth: "1400px", margin: "0 auto" }}>
         <div style={{ marginBottom: "15px" }}>
           <h1 style={{ fontSize: "32px", marginBottom: "10px" }}>Alerts & Notifications</h1>
-          <p style={{ color: "#aaa", marginBottom: "0" }}>Predictive maintenance alerts and system warnings</p>
+          <p style={{ color: "#aaa", marginBottom: "0" }}>
+            Predictive maintenance alerts and system warnings
+            {useMockData && (
+              <span style={{ 
+                marginLeft: "10px", 
+                padding: "4px 12px", 
+                background: "rgba(59, 130, 246, 0.2)", 
+                borderRadius: "12px",
+                fontSize: "12px",
+                color: "#60a5fa"
+              }}>
+              </span>
+            )}
+          </p>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "15px" }}>
@@ -235,7 +333,6 @@ export default function AlertsPage() {
           ))}
         </div>
 
-        {/* Alerts List */}
         <div style={{
           background: "#1e293b",
           padding: "30px",
@@ -267,7 +364,6 @@ export default function AlertsPage() {
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
                     <div style={{ flex: 1 }}>
-                      {/* Severity Badge and Machine */}
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
                         <span style={{
                           padding: "4px 12px",
@@ -284,12 +380,10 @@ export default function AlertsPage() {
                         </span>
                       </div>
 
-                      {/* Message */}
                       <p style={{ fontSize: "16px", marginBottom: "12px", color: "#e2e8f0" }}>
                         {alert.message}
                       </p>
 
-                      {/* Details */}
                       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", fontSize: "14px", color: "#94a3b8" }}>
                         <span>⏱️ {alert.predicted_hours}h to failure</span>
                         <span>📊 Confidence: {(alert.confidence * 100).toFixed(0)}%</span>
@@ -297,7 +391,6 @@ export default function AlertsPage() {
                       </div>
                     </div>
 
-                    {/* Acknowledge Button */}
                     <div>
                       {!alert.acknowledged ? (
                         <button

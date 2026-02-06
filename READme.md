@@ -26,6 +26,10 @@
 
 **PredictMaintAI** is an enterprise-grade predictive maintenance system that leverages machine learning and AI to monitor industrial equipment health, predict failures, and provide actionable maintenance recommendations. The system continuously analyzes sensor data from 8 different types of industrial machines and uses RAG (Retrieval-Augmented Generation) powered AI to provide expert maintenance insights.
 
+
+We Won Second Prize With This Working Demo In The Hackthon Conducted At Jain University, Kochi
+
+
 ### Key Capabilities
 
 - ⚡ **Real-time Monitoring** - Live sensor data ingestion and processing
